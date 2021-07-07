@@ -23,7 +23,7 @@ from mpl_toolkits.mplot3d import Axes3D
 import glob 
 
 # import user modules
-usermodPath = r'c:\Users\giyash\OneDrive - Fraunhofer\Python\Scripts\testfeld-bhv\userModules'
+usermodPath = r'../../userModules'
 sys.path.append(usermodPath)
 import pythonAssist
 from pythonAssist import *
@@ -32,7 +32,7 @@ plt.style.use('seaborn-whitegrid')
 SMALL_SIZE = 17
 MEDIUM_SIZE = 22
 BIGGER_SIZE = 22
-AppendLog=0
+AppendLog=1
 
 plt.rc('font', size=SMALL_SIZE,weight = 'bold')          # controls default text sizes
 plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
