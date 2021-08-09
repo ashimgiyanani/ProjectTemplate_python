@@ -34,8 +34,8 @@ import re
 from odc_exportData import odc_exportData
 from datetime import *
 
-begin = datetime(2021, 6, 27, 0, 0, tzinfo=timezone.utc)
-end   = datetime(2021, 7, 7, 0, 0, tzinfo=timezone.utc)
+begin = datetime(2021, 7, 7, 0, 0, tzinfo=timezone.utc)
+end   = datetime(2021, 8, 9, 0, 0, tzinfo=timezone.utc)
 sampleRate = 1/600
 AppendLog = 1
 

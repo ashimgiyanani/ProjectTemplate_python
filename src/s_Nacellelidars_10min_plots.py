@@ -40,7 +40,7 @@ def today():
     today =  datetime.today().strftime("%d.%m.%Y")
     return today
 
-# sys.path.insert(1, r'c:\Users\giyash\ownCloud\Data\TestfeldBHV')
+sys.path.insert(1, r'../fun')
 
 plt.style.use('seaborn-whitegrid')
 SMALL_SIZE = 22
@@ -62,7 +62,7 @@ plt.rc('figure', figsize =  (8, 8))
 
 # Change parameters to select the data
 device = 'GreenPO' #Select between GreenPO, BluePO, BlackTC
-dt_start ='2021-06-28_00-00-00' # Select start date in the form yyyy-mm-dd_HH-MM-SS
+dt_start ='2021-08-02_00-00-00' # Select start date in the form yyyy-mm-dd_HH-MM-SS
 param = 'HWS hub'
 N_dist = (10,20,20)
 

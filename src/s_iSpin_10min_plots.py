@@ -44,13 +44,13 @@ plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 plt.rc('figure', figsize =  (8, 8))
 
 #%% Import data
-dt_start ='2021-05-31 00:00:00' # Select start date in the form yyyy-mm-dd_HH-MM-SS
+dt_start ='2021-08-02 00:00:00' # Select start date in the form yyyy-mm-dd_HH-MM-SS
 
 dt_end = dt.datetime.strptime(dt_start, '%Y-%m-%d %H:%M:%S')  + dt.timedelta(days=7)# Select end date in the form yyyy-mm-dd_HH-MM-SS
 dt_end = dt_end.strftime('%Y-%m-%d %H:%M:%S')
 
 # Import csv
-path = r'Z:\Projekte\109797-TestfeldBHV\30_Technical_execution_Confidential\TP3\AP2_Aufbau_Infrastruktur\Infrastruktur_Windmessung\02_Equipment\02_iSpin\Data'
+path = r'Z:\Projekte\109797-TestfeldBHV\30_Technical_execution_Confidential\TP3\AP2_Aufbau_Infrastruktur\Infrastruktur_Windmessung\02_Equipment\02_iSpin\Data\10min_Data'
 filename = glob.glob(path+'\Bremerhaven WTG01*.csv')
 df=pd.read_csv(filename[0], sep = ';',decimal = ',',header=0)
 
@@ -141,7 +141,7 @@ ax[3].set_xlim([ dt.datetime.strptime(dt_start, '%Y-%m-%d %H:%M:%S'), dt.datetim
 ax[3].set_ylim([-5,110])
 plt.xlabel('date',labelpad=10,weight= 'bold')
 plt.subplots_adjust(wspace=0, hspace=0.1)
-plt.savefig(r'Z:\Projekte\109797-TestfeldBHV\30_Technical_execution_Confidential\TP3\AP2_Aufbau_Infrastruktur\Infrastruktur_Windmessung\02_Equipment\02_iSpin\Data\QM\\'+dt_start[0:10]+'_'+dt_end[0:10]+'.png',
+plt.savefig(r'Z:\Projekte\109797-TestfeldBHV\30_Technical_execution_Confidential\TP3\AP2_Aufbau_Infrastruktur\Infrastruktur_Windmessung\02_Equipment\02_iSpin\Data\10min_Data\QM\\'+dt_start[0:10]+'_'+dt_end[0:10]+'.png',
             bbox_inches='tight',dpi = 100)
 plt.show()
 
