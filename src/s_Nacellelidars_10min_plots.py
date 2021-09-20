@@ -62,9 +62,8 @@ plt.rc('figure', figsize =  (8, 8))
 
 # Change parameters to select the data
 device = 'GreenPO' #Select between GreenPO, BluePO, BlackTC
-dt_start ='2021-08-02_00-00-00' # Select start date in the form yyyy-mm-dd_HH-MM-SS
+dt_start ='2021-09-06_00-00-00' # Select start date in the form yyyy-mm-dd_HH-MM-SS
 param = 'HWS hub'
-N_dist = (10,20,20)
 
 
 dt_end = dt.datetime.strptime(dt_start, '%Y-%m-%d_%H-%M-%S')  + dt.timedelta(days=7)# Select end date in the form yyyy-mm-dd_HH-MM-SS
@@ -93,6 +92,8 @@ if i_RaworAverage:
         df = df_all[n]
         ## Filtering conditions
         cond0 = df[param].notnull()
+        df['CNR2'] = pd.to_numeric(df['CNR2'], errors='coerce')
+        df['CNR3'] = pd.to_numeric(df['CNR3'], errors='coerce')
         cond2 = (df['CNR2']>-33) & (df['CNR3']>-33)
         cond3 = (df['HWS low Availability']>=0.0)
         cond4 = (df['Distance']==i_range)
@@ -191,6 +192,7 @@ if i_RaworAverage:
     plt.show()
 
     if SpecialPlots == 1:
+        df['HWS hub'] = df['HWS hub'].apply(pd.to_numeric, errors='coerce')
         cond_sp = (df['HWS hub']>=0) & (df['HWS hub']<=40)
         fig, ax = plt.subplots(1,1, figsize = (8,4), sharex=True)
         plt.plot(df['Date and Time'][cond_sp], df['HWS hub'][cond_sp], 'k.')

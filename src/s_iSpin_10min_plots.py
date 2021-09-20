@@ -44,7 +44,7 @@ plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 plt.rc('figure', figsize =  (8, 8))
 
 #%% Import data
-dt_start ='2021-08-02 00:00:00' # Select start date in the form yyyy-mm-dd_HH-MM-SS
+dt_start ='2021-09-06 00:00:00' # Select start date in the form yyyy-mm-dd_HH-MM-SS
 
 dt_end = dt.datetime.strptime(dt_start, '%Y-%m-%d %H:%M:%S')  + dt.timedelta(days=7)# Select end date in the form yyyy-mm-dd_HH-MM-SS
 dt_end = dt_end.strftime('%Y-%m-%d %H:%M:%S')

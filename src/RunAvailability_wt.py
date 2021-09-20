@@ -4,6 +4,15 @@ Created on Wed Mar  3 19:41:21 2021
 
 @author: giyash
 """
+# Steps to include in the script:
+# import all the channels from OneDAS [##### 100%]
+# arrange them into one database and one datetime format [#### 80%]
+# perform a standardized check using a function definition [0%]
+# perform an advanced check using a function definition [0%]
+# write the results to an excel file which serves as a logbook for all the sensors [## 40%]
+# save the pdf report generated on the Z drive [# 20%]
+# send the report to all recipents [0%]
+ 
 ## user modules
 import pandas as pd
 import glob
@@ -11,20 +20,15 @@ import os
 import numpy as np
 import sys
 sys.path.append(r"../../userModules")
+# sys.path.append(r"../fun") # change to this when sharing the data
 sys.path.append(r"../../OneDasExplorer/Python Connector")
 
 import runpy as rp
 from FnWsRange import *
-# import altair as alt
-# import datapane as dp
 import matplotlib.pyplot as plt
-# from sanitize_dataframe import sanitize_dataframe
-#datapane login --token=cebae30aca77e1422a72442c8c7113378fca57b3
-# import altair_viewer as av
 
 from csv import writer
 import matlab2py as m2p
-# from detecta import detect_peaks
 from pythonAssist import *
 import tikzplotlib as tz
 from AD180 import AD180
@@ -32,46 +36,205 @@ from datetime import datetime
 import re
 
 from odc_exportData import odc_exportData
+from FnImportOneDas import FnImportOneDas
 from datetime import *
 
-begin = datetime(2021, 7, 7, 0, 0, tzinfo=timezone.utc)
-end   = datetime(2021, 8, 9, 0, 0, tzinfo=timezone.utc)
-sampleRate = 1/600
-AppendLog = 1
+begin = datetime(2021, 6, 13, 0, 0, tzinfo=timezone.utc)
+end   = datetime(2021, 6, 16, 0, 0, tzinfo=timezone.utc)
+sampleRate = 600
+AppendLog = 0
 
 # must all be of the same sample rate
 channel_paths = [
-    "/AIRPORT/AD8_PROTOTYPE/GENERAL_DAQ/M0000_V1/600 s_mean",
-    "/AIRPORT/AD8_PROTOTYPE/GENERAL_DAQ/P0420_RotorSpdRaw/600 s_mean",
+    '/AIRPORT/AD8_PROTOTYPE/GENERAL_DAQ/M0000_V1/600 s_mean',
+    '/AIRPORT/AD8_PROTOTYPE/GENERAL_DAQ/P0420_RotorSpdRaw/600 s_mean',
+    '/AIRPORT/AD8_PROTOTYPE/GENERAL_DAQ/M0010_V2/600 s_mean',
+    '/AIRPORT/AD8_PROTOTYPE/GENERAL_DAQ/M0020_V3/600 s_mean',
+    '/AIRPORT/AD8_PROTOTYPE/GENERAL_DAQ/M0030_V4/600 s_mean',
+    '/AIRPORT/AD8_PROTOTYPE/GENERAL_DAQ/M0040_V5/600 s_mean',
+    '/AIRPORT/AD8_PROTOTYPE/GENERAL_DAQ/M0050_V6/600 s_mean',
+    '/AIRPORT/AD8_PROTOTYPE/GENERAL_DAQ/M0060_Precipitation/600 s_mean',
+    '/AIRPORT/AD8_PROTOTYPE/GENERAL_DAQ/M0070_D1/600 s_mean_polar',
+    '/AIRPORT/AD8_PROTOTYPE/GENERAL_DAQ/M0100_D4/600 s_mean_polar',
+    '/AIRPORT/AD8_PROTOTYPE/GENERAL_DAQ/M0110_D5/600 s_mean_polar',
+    '/AIRPORT/AD8_PROTOTYPE/GENERAL_DAQ/M0200_B1/600 s_mean',
+    '/AIRPORT/AD8_PROTOTYPE/GENERAL_DAQ/M0210_B2/600 s_mean',
+    '/AIRPORT/AD8_PROTOTYPE/GENERAL_DAQ/M0220_T1/600 s_mean',
+    '/AIRPORT/AD8_PROTOTYPE/ISPIN/SaDataValid/600 s',
+    '/AIRPORT/AD8_PROTOTYPE/ISPIN/WS_free_avg/600 s',
+    '/AIRPORT/AD8_PROTOTYPE/ISPIN/DataOK/600 s',
+    '/AIRPORT/AD8_PROTOTYPE/LIDAR_2020/BlackTC_110m_HWS_hub/600 s',
+    '/AIRPORT/AD8_PROTOTYPE/LIDAR_2020/BluePO_110m_HWS_hub/600 s',
+    '/AIRPORT/AD8_PROTOTYPE/LIDAR_2020/GreenPO_110m_HWS_hub/600 s',
+    '/AIRPORT/AD8_PROTOTYPE/LIDAR_2020/BlackTC_110m_HWS_hub_availability/600 s',
+    '/AIRPORT/AD8_PROTOTYPE/LIDAR_2020/BluePO_110m_HWS_hub_availability/600 s',
+    '/AIRPORT/AD8_PROTOTYPE/LIDAR_2020/GreenPO_110m_HWS_hub_availability/600 s',
+    '/AIRPORT/AD8_PROTOTYPE/WIND_CUBE/WC_115m_Wind_Speed/600 s',
                 ]
 # Provide the names that you want to give to the channel paths
-ch_names = ['v1','omega']
-target_folder = r"c:/Users/giyash/OneDrive - Fraunhofer/Python/Scripts/OneDasExplorer/Python Connector/data"
-data = odc_exportData(begin, end, channel_paths, target_folder)
-odcData = struct()
-# assign the data values to variable names that are given by ch_names
-i = 0
-for keys in data:
-    setattr(odcData,ch_names[i], data[keys].values)        
-    i = i+1
-    time = [begin + timedelta(seconds=i/sampleRate) for i in range(len(odcData.v1))]
-    tnew = pd.DatetimeIndex(time) # concert to datetime64 format
-    setattr(odcData,'t',time)
+ch_names = [
+        'v1',
+        'omega',
+        'v2',
+        'v3',
+        'v4',
+        'v5',
+        'v6',
+        'prec',
+        'd1',
+        'd4',
+        'd5',
+        'b1',
+        'b2',
+        'T1',
+        's_valid',
+        's_V', 
+        's_ok',
+        'btc_v110',
+        'bpo_v110', 
+        'gpo_v110', 
+        'btc_Av110', 
+        'bpo_Av110', 
+        'gpo_Av110', 
+        'wc_v115',
+                ]
 
-odcData.omega = pd.DataFrame(odcData.omega)
-cond0 = odcData.omega.notnull()
-cond1 = (odcData.omega) > 1
+target_folder = r"../data"
+tstart = datetime.strptime('2021-09-13_00-00-00', '%Y-%m-%d_%H-%M-%S') # Select start date in the form yyyy-mm-dd_HH-MM-SS
+# funktioniert
+tend = tstart + timedelta(days=7) # Select start date in the form yyyy-mm-dd_HH-MM-SS
+odcData, pdData, t = FnImportOneDas(tstart, tend, channel_paths, ch_names, sampleRate, target_folder)
+
+#%% Check the availability of the wind turbine
+Npts = len(pdData.omega)
+cond0 = pdData.omega.notnull()
+cond1 = (pdData.omega) > 1
 Avail = (cond0 & cond1).astype('uint8')
 daily_avail = []
-for i in np.arange(int(len(odcData.omega)/144)):
-    avail = Avail[144*i:144*(i+1)].mean(axis=0)
-    if avail[0] > 0.25:
+avail= np.nan*np.ones(int(Npts/144), dtype=np.float16, )
+dt = np.zeros((int(Npts/144),1), dtype=object)
+Nvalid = np.sum(Avail)
+Av_pct = np.round(Nvalid/Npts * 100, decimals=1)
+
+for i in np.arange(int(Npts/144)):
+    avail[i] = np.round(Avail[144*i:144*(i+1)].mean(axis=0), decimals=2)
+    dt[i] = t[144*i].date().strftime('%d/%m/%Y')
+    if avail[i] >= 0.25:
         daily_avail.append(1)
     else:
         daily_avail.append(0)
-    del(avail)
+    # del(avail)
+
+#%% Check the availability of iSpin
+## Filtering conditions
+cond0 = pdData.s_V.notnull() # non-zero values
+cond1 = (pdData.t>=tstart)&(pdData.t<tend) # time interval filtering
+cond2 = (pdData.s_valid==True) # 95% availability of 10 Hz data, wind vector +-90° in front of turbine within 10 min 
+cond3 = (pdData.s_ok==True)  # data.TotalCountNoRotation=0, 95% availability, min & max rotor rpm, avg rotor rpm, free wind speed > 3.5 m/s, sample ID!= 0
+cond4 = (pdData.s_V > 0) & (pdData.s_V < 50) # wind speed physical limits
+
+## extra parameters for logbook
+# no. of pts during the last week 
+Npts = pdData.loc[(cond0 & cond1),'s_V'].shape[0]
+Nvalid = pdData.loc[(cond0 & cond1 & cond2),'s_V'].shape[0]
+Nws_valid = pdData.loc[(cond0 & cond1 & cond2),'s_V'].shape[0]
+Nwt_valid = pdData.loc[(cond0 & cond1 & cond2 & cond3),'s_V'].shape[0]
+Nyaw_valid = pdData.loc[(cond0 & cond1 & cond3),'s_V'].shape[0]
+# filling in the weekly availabiliy as 1/0 based on number of points
+weekly_avail = []
+
+import more_itertools
+step= 144
+length = 144
+idx = cond1[cond1==True].index
+N_win = np.int64(len(pdData.loc[cond1,'s_V'])/step)
+window = np.transpose(list(more_itertools.windowed(pdData.loc[cond1,'s_V'], n=length, fillvalue=np.nan, step=step)))
+condn = np.transpose(list(more_itertools.windowed(np.array(cond0[idx] & cond1[idx] & cond2[idx] & cond4[idx]), n=length, fillvalue=np.nan, step=step))).astype(bool)
+for i in np.arange(N_win):
+    daily_avail = window[condn[:,i],i].shape[0]/length
+    if daily_avail >= 0.6:
+        weekly_avail.append(1)
+    else:
+        weekly_avail.append(0)
+
+fig,ax = plt.subplots(1,1, figsize =  (10, 10),sharex=True) 
+ax.plot(pdData.t[(cond0 & cond1 & cond4)] , pdData.s_V[(cond0 & cond1 & cond4)] ,'.',label = 'Valid data')
+ax.set_xlabel('date',labelpad=40,weight= 'bold')
+ax.set_ylabel("WS_free_avg [m/s]",labelpad=40,weight= 'bold')
+date_form = DateFormatter("%d/%m")
+ax.xaxis.set_major_formatter(date_form)
+ax.set_xlim([ dt.datetime.strptime(tstart, '%Y-%m-%d %H:%M:%S'), dt.datetime.strptime(tend, '%Y-%m-%d %H:%M:%S')])
+ax.set_ylim([0,25])
     
-# ## Import data from csv
+#%% write the turbine availability to an excel file
+import openpyxl as opl
+xl_filepath = r'C:\Users\giyash\Documents\trial.xlsx'
+wb = opl.load_workbook(xl_filepath)
+#  grab the active worksheet
+ws = wb['Sheet1']
+# grab the workshet title
+ws_title = ws.title
+print('Active sheet title: {} \n'.format(ws_title))
+
+# appending the worksheet
+# iteration to find the last row with values in it
+nrows = ws.max_row
+lastrow = 0
+if nrows > 1000:
+    nrows = 1000
+while True:
+    if ws.cell(nrows, 3).value != None:
+        lastrow = nrows
+        break
+    else:
+        nrows -= 1
+
+# appending to the worksheet and saving it
+avgStr = '{} - {}'.format(tstart, tend)
+test_Data = ('Data {}'.format(input('Please enter OK or not OK plus any comments:')))
+appData = [today(), 'WT_Availability', 'QC check', avgStr,  test_Data, Npts, Nvalid, Av_pct ]
+appData.extend(np.transpose(daily_avail))
+# target = wb.copy_worksheet(ws) % making a copy of existing worksheet
+
+if AppendLog==1: # if AppendLog is wished at start
+    count=0
+    # iterate over all entries in appData array which contains variables for appending the excel
+    for ncol, entry in enumerate(appData,start=1):
+        # print(ncol, entry)
+        ws.cell(row=1+nrows, column=ncol, value=entry)
+        count += 1
+    print('[{}] - No. of entries made: {} \n'.format(now(), count))
+    wb.save(xl_filepath) # file should be closed to save
+    print('[{}] - Changes saved to: {} \n'.format(now(), ws_title))
+else:
+    print('[{}] - Changes not saved to: {} \n'.format(now(), ws_title))
+
+#%% publish a report of Wind turbine availability
+from reportlab.platypus import SimpleDocTemplate
+from reportlab.platypus import Paragraph, Spacer, Table, Image
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib import colors
+from reportlab.graphics.shapes import Drawing
+from reportlab.graphics.charts.piecharts import Pie
+from reportlab.lib.units import inch
+
+styles = getSampleStyleSheet()
+report = SimpleDocTemplate("../results/TurbineReport.pdf")
+# create a Title
+report_title = Paragraph("Testfeld BHV: AD8-180 turbine Availability report", styles["h1"])
+
+# create a Table
+# generate a table borders
+table_style = [('GRID', (0,0), (-1,-1), 1, colors.black)]
+# add data
+table_data = []
+for i in range(len(dt)):
+    table_data.append([dt[i], avail[i], daily_avail[i]])
+report_table = Table(data=table_data, style=table_style, hAlign="LEFT")
+
+report.build([report_title, report_table])
+
+#%% Removed code
 # path = r'c:\Users\giyash\OneDrive - Fraunhofer\Python\Data\OneDAS_2019-01-01T00-00_600_s_56c64a34'
 # filename = glob.glob(path+'\AIRPORT_AD8_PROTOTYPE*.csv')
 # df=pd.read_csv(filename[0], sep = ';',decimal = ',',header=9, skiprows=[10,11], usecols=[0,1,2], names=['index','cupWs', 'omega'])
@@ -87,52 +250,3 @@ for i in np.arange(int(len(odcData.omega)/144)):
 #         daily_avail.append(1)
 #     else:
 #         daily_avail.append(0)
-
-import openpyxl as opl
-xl_filepath = r'C:\Users\giyash\Documents\trial.xlsx'
-wb = opl.load_workbook(xl_filepath)
-#  grab the active worksheet
-ws = wb['Sheet1']
-# grab the workshet title
-ws_title = ws.title
-print('Active sheet title: {} \n'.format(ws_title))
-
-# appending the worksheet
-
-# iteration to find the last row with values in it
-nrows = ws.max_row
-lastrow = 0
-if nrows > 1000:
-    nrows = 1000
-while True:
-    if ws.cell(nrows, 3).value != None:
-        lastrow = nrows
-        break
-    else:
-        nrows -= 1
-
-    # appending to the worksheet and saving it
-if AppendLog==1: # if AppendLog is wished at start
-    count=0
-    # iterate over all entries in appData array which contains variables for appending the excel
-    for ncol, entry in enumerate(daily_avail,start=1):
-        # print(ncol, entry)
-        ws.cell(row=1+nrows, column=ncol, value=entry)
-        count += 1
-    print('[{}] - No. of entries made: {} \n'.format(now(), count))
-    wb.save(xl_filepath) # file should be closed to save
-    print('[{}] - Changes saved to: {} \n'.format(now(), ws_title))
-else:
-    print('[{}] - Changes not saved to: {} \n'.format(now(), ws_title))
-
-# #  Compare the wind speeds across different sensors
-# fig, ax = plt.subplots()
-# ax.plot(odcData.t,U[:,0],'m-', label = 'nac Lid BTC')
-# ax.plot(odcData.t,odcData.wc115m_U,'k--', label='WC@115m')
-# ax.plot(odcData.t,odcData.v1,'b-', label='cup1')
-# ax.plot(odcData.t,odcData.v2,'g-', label='cup2')
-# ax.plot(odcData.t,odcData.usa1_v,'r-', label= 'sonic1')
-# plt.xlabel('Time')
-# plt.ylabel('wind speeds [m/s]')
-# plt.legend()
-# plt.show()
