@@ -13,7 +13,7 @@ Created on Wed Mar  3 19:41:21 2021
 # save the pdf report generated on the Z drive [# 20%]
 # send the report to all recipents [0%]
  
-## user modules
+#%% user modules
 import pandas as pd
 import glob
 import os
@@ -39,6 +39,22 @@ from odc_exportData import odc_exportData
 from FnImportOneDas import FnImportOneDas
 from datetime import *
 
+#%% user definitions
+tiny = 12
+Small = 14
+Medium = 16
+Large = 18
+Huge = 22
+plt.rc('font', size=Small)          # controls default text sizes
+plt.rc('axes', titlesize=Small)     # fontsize of the axes title
+plt.rc('axes', labelsize=Large)    # fontsize of the x and y labels
+plt.rc('xtick', labelsize=Small)    # fontsize of the tick labels
+plt.rc('ytick', labelsize=Small)    # fontsize of the tick labels
+plt.rc('legend', fontsize=Medium)    # legend fontsize
+plt.rc('figure', titlesize=Huge)  # fontsize of the figure title
+
+
+#%% import data from OneDAS
 begin = datetime(2021, 6, 13, 0, 0, tzinfo=timezone.utc)
 end   = datetime(2021, 6, 16, 0, 0, tzinfo=timezone.utc)
 sampleRate = 600
@@ -105,12 +121,17 @@ tstart = datetime.strptime('2021-09-13_00-00-00', '%Y-%m-%d_%H-%M-%S') # Select 
 tend = tstart + timedelta(days=7) # Select start date in the form yyyy-mm-dd_HH-MM-SS
 odcData, pdData, t = FnImportOneDas(tstart, tend, channel_paths, ch_names, sampleRate, target_folder)
 
+index = pd.date_range(tstart, periods=7, freq='D')
+sensors = ['wt', 'ispin', 'btc', 'bpo', 'gpo', 'metmast', 'sonics', 'windcube']
+weekly_avail = pd.DataFrame(index=index, columns=sensors)
+weekly_avail = weekly_avail.fillna(0)
+
 #%% Check the availability of the wind turbine
 Npts = len(pdData.omega)
 cond0 = pdData.omega.notnull()
 cond1 = (pdData.omega) > 1
 Avail = (cond0 & cond1).astype('uint8')
-daily_avail = []
+wt_avail = []
 avail= np.nan*np.ones(int(Npts/144), dtype=np.float16, )
 dt = np.zeros((int(Npts/144),1), dtype=object)
 Nvalid = np.sum(Avail)
@@ -120,15 +141,16 @@ for i in np.arange(int(Npts/144)):
     avail[i] = np.round(Avail[144*i:144*(i+1)].mean(axis=0), decimals=2)
     dt[i] = t[144*i].date().strftime('%d/%m/%Y')
     if avail[i] >= 0.25:
-        daily_avail.append(1)
+        wt_avail.append(1)
     else:
-        daily_avail.append(0)
+        wt_avail.append(0)
     # del(avail)
+weekly_avail['wt'] = wt_avail
 
 #%% Check the availability of iSpin
 ## Filtering conditions
 cond0 = pdData.s_V.notnull() # non-zero values
-cond1 = (pdData.t>=tstart)&(pdData.t<tend) # time interval filtering
+cond1 = (pdData.t>=tstart)&(pdData.t<=tend) # time interval filtering
 cond2 = (pdData.s_valid==True) # 95% availability of 10 Hz data, wind vector +-90° in front of turbine within 10 min 
 cond3 = (pdData.s_ok==True)  # data.TotalCountNoRotation=0, 95% availability, min & max rotor rpm, avg rotor rpm, free wind speed > 3.5 m/s, sample ID!= 0
 cond4 = (pdData.s_V > 0) & (pdData.s_V < 50) # wind speed physical limits
@@ -141,7 +163,7 @@ Nws_valid = pdData.loc[(cond0 & cond1 & cond2),'s_V'].shape[0]
 Nwt_valid = pdData.loc[(cond0 & cond1 & cond2 & cond3),'s_V'].shape[0]
 Nyaw_valid = pdData.loc[(cond0 & cond1 & cond3),'s_V'].shape[0]
 # filling in the weekly availabiliy as 1/0 based on number of points
-weekly_avail = []
+ispin_avail = []
 
 import more_itertools
 step= 144
@@ -153,19 +175,54 @@ condn = np.transpose(list(more_itertools.windowed(np.array(cond0[idx] & cond1[id
 for i in np.arange(N_win):
     daily_avail = window[condn[:,i],i].shape[0]/length
     if daily_avail >= 0.6:
-        weekly_avail.append(1)
+        ispin_avail.append(1)
     else:
-        weekly_avail.append(0)
+        ispin_avail.append(0)
+weekly_avail['ispin'] = ispin_avail
 
-fig,ax = plt.subplots(1,1, figsize =  (10, 10),sharex=True) 
+from matplotlib.dates import DateFormatter
+from matplotlib.ticker import StrMethodFormatter
+fig,ax = plt.subplots(1,1, figsize =  (10, 4),sharex=True)
+ax.plot(pdData.t, pdData.s_V, 'k.', lw=0.5, label='all') 
 ax.plot(pdData.t[(cond0 & cond1 & cond4)] , pdData.s_V[(cond0 & cond1 & cond4)] ,'.',label = 'Valid data')
-ax.set_xlabel('date',labelpad=40,weight= 'bold')
-ax.set_ylabel("WS_free_avg [m/s]",labelpad=40,weight= 'bold')
+ax.set_xlabel('date')
+ax.set_ylabel("WS_free_avg [m/s]")
 date_form = DateFormatter("%d/%m")
 ax.xaxis.set_major_formatter(date_form)
-ax.set_xlim([ dt.datetime.strptime(tstart, '%Y-%m-%d %H:%M:%S'), dt.datetime.strptime(tend, '%Y-%m-%d %H:%M:%S')])
-ax.set_ylim([0,25])
-    
+ax.set_xlim([ datetime.strptime(str(tstart), '%Y-%m-%d %H:%M:%S'), datetime.strptime(str(tend), '%Y-%m-%d %H:%M:%S')])
+ax.set_ylim([-2,25])
+ax.legend()
+
+#%% check the availability of Nacelle Lidars
+dev = ['btc', 'bpo', 'gpo']
+Npts, Nvalid, Nws_valid = [], [], []
+for i in range(len(dev)):
+    avail = []
+    param = dev[i] + '_v110'
+    param_Av = dev[i] + '_Av110'
+    ## Filtering conditions
+    cond0 = pdData[param].notnull()
+    cond3 = (pdData[param_Av]>=0.0)
+    # Extra parameters for logbook
+    Npts.append(pdData[param].shape[0])
+    Nvalid.append(pdData[param].loc[cond0].shape[0])
+    Nws_valid.append(pdData[param].loc[cond0 & cond3].shape[0])
+    # filling in the weekly availabiliy as 1/0 based on number of points
+    import more_itertools
+    step= 144
+    length = 144
+    N_win = np.int64(len(pdData.loc[:,param])/step)
+    window = np.transpose(list(more_itertools.windowed(pdData.loc[:,param], n=length, fillvalue=np.nan, step=step)))
+    condn = np.transpose(list(more_itertools.windowed(np.array(cond0 & cond2 & cond3), n=length, fillvalue=np.nan, step=step))).astype(bool)
+    for j in np.arange(N_win):
+        daily_avail = window[condn[:,j],j].shape[0]/length
+        print('{:.1f}'.format(daily_avail))
+        if daily_avail > 0.3:
+            avail.append(1)
+        else:
+            avail.append(0)
+    weekly_avail[dev[i]] = avail
+
 #%% write the turbine availability to an excel file
 import openpyxl as opl
 xl_filepath = r'C:\Users\giyash\Documents\trial.xlsx'
@@ -240,11 +297,11 @@ report.build([report_title, report_table])
 # df=pd.read_csv(filename[0], sep = ';',decimal = ',',header=9, skiprows=[10,11], usecols=[0,1,2], names=['index','cupWs', 'omega'])
 # time = [begin + timedelta(seconds=i/sampleRate) for i in range(len(df['index']))]
 
-# cond0 = df.omega.notnull()
-# cond1 = pd.to_numeric(df.omega) > 0
+# cond0 = pdData.omega.notnull()
+# cond1 = pd.to_numeric(pdData.omega) > 0
 # Avail = (cond0 & cond1).astype('uint8')
 # daily_avail = []
-# for i in np.arange(int(len(df.omega)/144)):
+# for i in np.arange(int(len(pdData.omega)/144)):
 #     avail = Avail[144*i:144*(i+1)].mean()
 #     if avail > 0.25:
 #         daily_avail.append(1)
