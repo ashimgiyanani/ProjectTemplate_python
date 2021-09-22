@@ -85,7 +85,7 @@ channel_paths = [
     '/AIRPORT/AD8_PROTOTYPE/LIDAR_2020/BlackTC_110m_HWS_hub_availability/600 s',
     '/AIRPORT/AD8_PROTOTYPE/LIDAR_2020/BluePO_110m_HWS_hub_availability/600 s',
     '/AIRPORT/AD8_PROTOTYPE/LIDAR_2020/GreenPO_110m_HWS_hub_availability/600 s',
-    '/AIRPORT/AD8_PROTOTYPE/WIND_CUBE/WC_115m_Wind_Speed/600 s',
+    '/AIRPORT/AD8_PROTOTYPE/WIND_CUBE/WC_115m_Wind_Speed/600 s'
                 ]
 # Provide the names that you want to give to the channel paths
 ch_names = [
@@ -112,8 +112,8 @@ ch_names = [
         'btc_Av110', 
         'bpo_Av110', 
         'gpo_Av110', 
-        'wc_v115',
-                ]
+        'wc_v115'
+        ]
 
 target_folder = r"../data"
 tstart = datetime.strptime('2021-09-13_00-00-00', '%Y-%m-%d_%H-%M-%S') # Select start date in the form yyyy-mm-dd_HH-MM-SS
@@ -223,6 +223,69 @@ for i in range(len(dev)):
             avail.append(0)
     weekly_avail[dev[i]] = avail
 
+#%% check the availability of the metmast sensors
+param = ['v1','v2','v3','v4','v5','v6','prec','d1','d4','d5','b1','b2','T1']
+# weekly_avail = pd.DataFrame(index=index, columns=param)
+
+for i in range(len(param)):
+    avail=[]
+    # Filtering conditions
+    cond0 = pdData[param[i]].notnull()
+    # Extra parameters for logbook
+    Npts.append(pdData[param[i]].shape[0])
+    Nvalid.append(pdData[param[i]].loc[cond0].shape[0])
+    Nws_valid.append(pdData[param[i]].loc[cond0 & cond3].shape[0])
+    # filling in the weekly availabiliy as 1/0 based on number of points
+    step= 144
+    length = 144
+    N_win = np.int64(len(pdData.loc[:,param[i]])/step)
+    window = np.transpose(list(more_itertools.windowed(pdData.loc[:,param[i]], n=length, fillvalue=np.nan, step=step)))
+    condn = np.transpose(list(more_itertools.windowed(np.array(cond0), n=length, fillvalue=np.nan, step=step))).astype(bool)
+    for j in np.arange(N_win):
+        daily_avail = window[condn[:,j],j].shape[0]/length
+        print('{:.1f}'.format(daily_avail))
+        if daily_avail > 0.3:
+            avail.append(1)
+        else:
+            avail.append(0)
+    weekly_avail[param[i]] = avail
+    del avail
+threshold = 0.25
+weekly_avail['metmast'] = [int(round(x-threshold + 0.5)) for x in weekly_avail.loc[:, param].mean(axis=1)]
+
+#%% check the availability of sonic anemometers
+channel_paths =     [
+    '/AIRPORT/AD8_PROTOTYPE/METMAST_EXTENSION/gill_115_u/20 Hz',
+    '/AIRPORT/AD8_PROTOTYPE/METMAST_EXTENSION/gill_55_u/20 Hz',
+    '/AIRPORT/AD8_PROTOTYPE/METMAST_EXTENSION/thies_25_Vx/20 Hz'
+    ]
+ch_names =
+odcData, pdData, t = FnImportOneDas(tstart, tend, channel_paths, ch_names, sampleRate, target_folder)
+
+avail=[]
+# Filtering conditions
+cond0 = pdData[param[i]].notnull()
+# Extra parameters for logbook
+Npts.append(pdData[param[i]].shape[0])
+Nvalid.append(pdData[param[i]].loc[cond0].shape[0])
+Nws_valid.append(pdData[param[i]].loc[cond0 & cond3].shape[0])
+# filling in the weekly availabiliy as 1/0 based on number of points
+step= 144
+length = 144
+N_win = np.int64(len(pdData.loc[:,param[i]])/step)
+window = np.transpose(list(more_itertools.windowed(pdData.loc[:,param[i]], n=length, fillvalue=np.nan, step=step)))
+condn = np.transpose(list(more_itertools.windowed(np.array(cond0), n=length, fillvalue=np.nan, step=step))).astype(bool)
+for j in np.arange(N_win):
+    daily_avail = window[condn[:,j],j].shape[0]/length
+    print('{:.1f}'.format(daily_avail))
+    if daily_avail > 0.3:
+        avail.append(1)
+    else:
+        avail.append(0)
+weekly_avail[param[i]] = avail
+
+
+sys.exit('Manual stop')
 #%% write the turbine availability to an excel file
 import openpyxl as opl
 xl_filepath = r'C:\Users\giyash\Documents\trial.xlsx'
