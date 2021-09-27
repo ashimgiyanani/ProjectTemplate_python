@@ -55,8 +55,8 @@ plt.rc('figure', titlesize=Huge)  # fontsize of the figure title
 
 
 #%% import data from OneDAS
-begin = datetime(2021, 6, 13, 0, 0, tzinfo=timezone.utc)
-end   = datetime(2021, 6, 16, 0, 0, tzinfo=timezone.utc)
+begin = datetime(2021, 9, 14, 0, 0, tzinfo=timezone.utc)
+end   = datetime(2021, 9, 15, 0, 0, tzinfo=timezone.utc)
 sampleRate = 600
 AppendLog = 0
 
@@ -115,12 +115,14 @@ ch_names = [
         'wc_v115'
         ]
 
+# folder where data will be stored 
 target_folder = r"../data"
+# start and end datetime for data download
 tstart = datetime.strptime('2021-09-13_00-00-00', '%Y-%m-%d_%H-%M-%S') # Select start date in the form yyyy-mm-dd_HH-MM-SS
 # funktioniert
-tend = tstart + timedelta(days=7) # Select start date in the form yyyy-mm-dd_HH-MM-SS
+tend = tstart + timedelta(days=1) # Select start date in the form yyyy-mm-dd_HH-MM-SS
 odcData, pdData, t = FnImportOneDas(tstart, tend, channel_paths, ch_names, sampleRate, target_folder)
-
+# create a pandas dataframe
 index = pd.date_range(tstart, periods=7, freq='D')
 sensors = ['wt', 'ispin', 'btc', 'bpo', 'gpo', 'metmast', 'sonics', 'windcube']
 weekly_avail = pd.DataFrame(index=index, columns=sensors)
@@ -128,9 +130,9 @@ weekly_avail = weekly_avail.fillna(0)
 
 #%% Check the availability of the wind turbine
 Npts = len(pdData.omega)
-cond0 = pdData.omega.notnull()
-cond1 = (pdData.omega) > 1
-Avail = (cond0 & cond1).astype('uint8')
+wt_cond0 = pdData.omega.notnull()
+wt_cond1 = (pdData.omega) > 1
+Avail = (wt_cond0 & wt_cond1).astype('uint8')
 wt_avail = []
 avail= np.nan*np.ones(int(Npts/144), dtype=np.float16, )
 dt = np.zeros((int(Npts/144),1), dtype=object)
@@ -149,29 +151,29 @@ weekly_avail['wt'] = wt_avail
 
 #%% Check the availability of iSpin
 ## Filtering conditions
-cond0 = pdData.s_V.notnull() # non-zero values
-cond1 = (pdData.t>=tstart)&(pdData.t<=tend) # time interval filtering
-cond2 = (pdData.s_valid==True) # 95% availability of 10 Hz data, wind vector +-90° in front of turbine within 10 min 
-cond3 = (pdData.s_ok==True)  # data.TotalCountNoRotation=0, 95% availability, min & max rotor rpm, avg rotor rpm, free wind speed > 3.5 m/s, sample ID!= 0
-cond4 = (pdData.s_V > 0) & (pdData.s_V < 50) # wind speed physical limits
+s_cond0 = pdData.s_V.notnull() # non-zero values
+s_cond1 = (pdData.t>=tstart)&(pdData.t<=tend) # time interval filtering
+s_cond2 = (pdData.s_valid==True) # 95% availability of 10 Hz data, wind vector +-90° in front of turbine within 10 min 
+s_cond3 = (pdData.s_ok==True)  # data.TotalCountNoRotation=0, 95% availability, min & max rotor rpm, avg rotor rpm, free wind speed > 3.5 m/s, sample ID!= 0
+s_cond4 = (pdData.s_V > 0) & (pdData.s_V < 50) # wind speed physical limits
 
 ## extra parameters for logbook
 # no. of pts during the last week 
-Npts = pdData.loc[(cond0 & cond1),'s_V'].shape[0]
-Nvalid = pdData.loc[(cond0 & cond1 & cond2),'s_V'].shape[0]
-Nws_valid = pdData.loc[(cond0 & cond1 & cond2),'s_V'].shape[0]
-Nwt_valid = pdData.loc[(cond0 & cond1 & cond2 & cond3),'s_V'].shape[0]
-Nyaw_valid = pdData.loc[(cond0 & cond1 & cond3),'s_V'].shape[0]
+Npts = pdData.loc[(s_cond0 & s_cond1),'s_V'].shape[0]
+Nvalid = pdData.loc[(s_cond0 & s_cond1 & s_cond2),'s_V'].shape[0]
+Nws_valid = pdData.loc[(s_cond0 & s_cond1 & s_cond2),'s_V'].shape[0]
+Nwt_valid = pdData.loc[(s_cond0 & s_cond1 & s_cond2 & s_cond3),'s_V'].shape[0]
+Nyaw_valid = pdData.loc[(s_cond0 & s_cond1 & s_cond3),'s_V'].shape[0]
 # filling in the weekly availabiliy as 1/0 based on number of points
 ispin_avail = []
 
 import more_itertools
 step= 144
 length = 144
-idx = cond1[cond1==True].index
-N_win = np.int64(len(pdData.loc[cond1,'s_V'])/step)
+idx = s_cond1[s_cond1==True].index
+N_win = np.int64(len(pdData.loc[s_cond1,'s_V'])/step)
 window = np.transpose(list(more_itertools.windowed(pdData.loc[cond1,'s_V'], n=length, fillvalue=np.nan, step=step)))
-condn = np.transpose(list(more_itertools.windowed(np.array(cond0[idx] & cond1[idx] & cond2[idx] & cond4[idx]), n=length, fillvalue=np.nan, step=step))).astype(bool)
+condn = np.transpose(list(more_itertools.windowed(np.array(s_cond0[idx] & s_cond1[idx] & s_cond2[idx] & s_cond4[idx]), n=length, fillvalue=np.nan, step=step))).astype(bool)
 for i in np.arange(N_win):
     daily_avail = window[condn[:,i],i].shape[0]/length
     if daily_avail >= 0.6:
@@ -179,19 +181,6 @@ for i in np.arange(N_win):
     else:
         ispin_avail.append(0)
 weekly_avail['ispin'] = ispin_avail
-
-from matplotlib.dates import DateFormatter
-from matplotlib.ticker import StrMethodFormatter
-fig,ax = plt.subplots(1,1, figsize =  (10, 4),sharex=True)
-ax.plot(pdData.t, pdData.s_V, 'k.', lw=0.5, label='all') 
-ax.plot(pdData.t[(cond0 & cond1 & cond4)] , pdData.s_V[(cond0 & cond1 & cond4)] ,'.',label = 'Valid data')
-ax.set_xlabel('date')
-ax.set_ylabel("WS_free_avg [m/s]")
-date_form = DateFormatter("%d/%m")
-ax.xaxis.set_major_formatter(date_form)
-ax.set_xlim([ datetime.strptime(str(tstart), '%Y-%m-%d %H:%M:%S'), datetime.strptime(str(tend), '%Y-%m-%d %H:%M:%S')])
-ax.set_ylim([-2,25])
-ax.legend()
 
 #%% check the availability of Nacelle Lidars
 dev = ['btc', 'bpo', 'gpo']
@@ -201,19 +190,19 @@ for i in range(len(dev)):
     param = dev[i] + '_v110'
     param_Av = dev[i] + '_Av110'
     ## Filtering conditions
-    cond0 = pdData[param].notnull()
-    cond3 = (pdData[param_Av]>=0.0)
+    nl_cond0 = pdData[param].notnull()
+    nl_cond3 = (pdData[param_Av]>=0.0)
     # Extra parameters for logbook
     Npts.append(pdData[param].shape[0])
-    Nvalid.append(pdData[param].loc[cond0].shape[0])
-    Nws_valid.append(pdData[param].loc[cond0 & cond3].shape[0])
+    Nvalid.append(pdData[param].loc[nl_cond0].shape[0])
+    Nws_valid.append(pdData[param].loc[nl_cond0 & nl_cond3].shape[0])
     # filling in the weekly availabiliy as 1/0 based on number of points
     import more_itertools
     step= 144
     length = 144
     N_win = np.int64(len(pdData.loc[:,param])/step)
     window = np.transpose(list(more_itertools.windowed(pdData.loc[:,param], n=length, fillvalue=np.nan, step=step)))
-    condn = np.transpose(list(more_itertools.windowed(np.array(cond0 & cond2 & cond3), n=length, fillvalue=np.nan, step=step))).astype(bool)
+    condn = np.transpose(list(more_itertools.windowed(np.array(nl_cond0 & nl_cond2 & nl_cond3), n=length, fillvalue=np.nan, step=step))).astype(bool)
     for j in np.arange(N_win):
         daily_avail = window[condn[:,j],j].shape[0]/length
         print('{:.1f}'.format(daily_avail))
@@ -230,17 +219,17 @@ param = ['v1','v2','v3','v4','v5','v6','prec','d1','d4','d5','b1','b2','T1']
 for i in range(len(param)):
     avail=[]
     # Filtering conditions
-    cond0 = pdData[param[i]].notnull()
+    mm_cond0 = pdData[param[i]].notnull()
     # Extra parameters for logbook
     Npts.append(pdData[param[i]].shape[0])
-    Nvalid.append(pdData[param[i]].loc[cond0].shape[0])
-    Nws_valid.append(pdData[param[i]].loc[cond0 & cond3].shape[0])
+    Nvalid.append(pdData[param[i]].loc[mm_cond0].shape[0])
+    Nws_valid.append(pdData[param[i]].loc[mm_cond0 & mm_cond3].shape[0])
     # filling in the weekly availabiliy as 1/0 based on number of points
     step= 144
     length = 144
     N_win = np.int64(len(pdData.loc[:,param[i]])/step)
     window = np.transpose(list(more_itertools.windowed(pdData.loc[:,param[i]], n=length, fillvalue=np.nan, step=step)))
-    condn = np.transpose(list(more_itertools.windowed(np.array(cond0), n=length, fillvalue=np.nan, step=step))).astype(bool)
+    condn = np.transpose(list(more_itertools.windowed(np.array(mm_cond0), n=length, fillvalue=np.nan, step=step))).astype(bool)
     for j in np.arange(N_win):
         daily_avail = window[condn[:,j],j].shape[0]/length
         print('{:.1f}'.format(daily_avail))
@@ -253,28 +242,20 @@ for i in range(len(param)):
 threshold = 0.25
 weekly_avail['metmast'] = [int(round(x-threshold + 0.5)) for x in weekly_avail.loc[:, param].mean(axis=1)]
 
-#%% check the availability of sonic anemometers
-channel_paths =     [
-    '/AIRPORT/AD8_PROTOTYPE/METMAST_EXTENSION/gill_115_u/20 Hz',
-    '/AIRPORT/AD8_PROTOTYPE/METMAST_EXTENSION/gill_55_u/20 Hz',
-    '/AIRPORT/AD8_PROTOTYPE/METMAST_EXTENSION/thies_25_Vx/20 Hz'
-    ]
-ch_names =
-odcData, pdData, t = FnImportOneDas(tstart, tend, channel_paths, ch_names, sampleRate, target_folder)
-
+#%% Check the availability of WindCube
 avail=[]
 # Filtering conditions
-cond0 = pdData[param[i]].notnull()
+wc_cond0 = pdData['wc_v115'].notnull()
 # Extra parameters for logbook
-Npts.append(pdData[param[i]].shape[0])
-Nvalid.append(pdData[param[i]].loc[cond0].shape[0])
-Nws_valid.append(pdData[param[i]].loc[cond0 & cond3].shape[0])
+Npts.append(pdData['wc_v115'].shape[0])
+Nvalid.append(pdData['wc_v115'].loc[wc_cond0].shape[0])
+Nws_valid.append(pdData['wc_v115'].loc[wc_cond0].shape[0])
 # filling in the weekly availabiliy as 1/0 based on number of points
 step= 144
 length = 144
-N_win = np.int64(len(pdData.loc[:,param[i]])/step)
-window = np.transpose(list(more_itertools.windowed(pdData.loc[:,param[i]], n=length, fillvalue=np.nan, step=step)))
-condn = np.transpose(list(more_itertools.windowed(np.array(cond0), n=length, fillvalue=np.nan, step=step))).astype(bool)
+N_win = np.int64(len(pdData.loc[:,'wc_v115'])/step)
+window = np.transpose(list(more_itertools.windowed(pdData.loc[:,'wc_v115'], n=length, fillvalue=np.nan, step=step)))
+condn = np.transpose(list(more_itertools.windowed(np.array(wc_cond0), n=length, fillvalue=np.nan, step=step))).astype(bool)
 for j in np.arange(N_win):
     daily_avail = window[condn[:,j],j].shape[0]/length
     print('{:.1f}'.format(daily_avail))
@@ -282,7 +263,67 @@ for j in np.arange(N_win):
         avail.append(1)
     else:
         avail.append(0)
-weekly_avail[param[i]] = avail
+weekly_avail['windcube'] = avail
+del avail
+
+#%% check the availability of sonic anemometers
+channel_paths =     [
+    '/AIRPORT/AD8_PROTOTYPE/METMAST_EXTENSION/gill_115_u/20 Hz',
+    '/AIRPORT/AD8_PROTOTYPE/METMAST_EXTENSION/gill_55_u/20 Hz',
+    '/AIRPORT/AD8_PROTOTYPE/METMAST_EXTENSION/thies_25_Vx/20 Hz',
+    ]
+ch_names = [
+        'gill_u115',
+        'gill_u55',
+        'thies_u25',
+            ]
+sampleRate = 20
+target_folder = r'../data'
+tstart = datetime.strptime('2021-09-01_00-00-00', '%Y-%m-%d_%H-%M-%S') # Select start date in the form yyyy-mm-dd_HH-MM-SS
+# funktioniert
+tend = tstart + timedelta(days=7) # Select start date in the form yyyy-mm-dd_HH-MM-SS
+odcData_sonics, pdData_sonics, t_sonics = FnImportOneDas(tstart, tend, channel_paths, ch_names, sampleRate, target_folder)
+param = ch_names
+
+
+
+for i in range(len(param)):
+    avail=[]
+    # Filtering conditions
+    sc_cond0 = pdData_sonics[param[i]].notnull()
+    # Extra parameters for logbook
+    Npts.append(pdData_sonics[param[i]].shape[0])
+    Nvalid.append(pdData_sonics[param[i]].loc[sc_cond0].shape[0])
+    Nws_valid.append(pdData_sonics[param[i]].loc[sc_cond0].shape[0])
+    daily_avail = new_func(sampleRate, avail, i, param, pdData_sonics, sc_cond0)
+    del avail
+# averaging the gill and thies availability into one column 'sonics'
+threshold = 0.25
+weekly_avail['sonics'] = [int(round(x-threshold + 0.5)) for x in weekly_avail.loc[:, param].mean(axis=1)]
+
+#%% plot the figures to be input into the pdf report
+from matplotlib.dates import DateFormatter
+from matplotlib.ticker import StrMethodFormatter
+fig,ax = plt.subplots(4,1, figsize =  (10, 16),sharex=True)
+ax[0].plot(pdData.t, pdData.s_V, 'k.', lw=0.5, label='all') 
+ax[0].plot(pdData.t[(cond0 & cond1 & cond4)] , pdData.s_V[(cond0 & cond1 & cond4)] ,'.',label = 'Valid data')
+ax[0].set_xlabel('date')
+ax[0].set_ylabel("WS_free_avg [m/s]")
+date_form = DateFormatter("%d/%m")
+ax[0].xaxis.set_major_formatter(date_form)
+ax[0].set_xlim([ datetime.strptime(str(tstart), '%Y-%m-%d %H:%M:%S'), datetime.strptime(str(tend), '%Y-%m-%d %H:%M:%S')])
+ax[0].set_ylim([-2,25])
+ax[0].legend()
+
+ax[1].plot(pdData.t, pdData.omega, 'k.', lw=0.5, label='all') 
+ax[1].plot(pdData.t[cond0] , pdData.s_V[cond0] ,'.',label = 'Valid data')
+ax[1].set_xlabel('date')
+ax[1].set_ylabel("WT omega [rpm]")
+date_form = DateFormatter("%d/%m")
+ax[1].xaxis.set_major_formatter(date_form)
+ax[1].set_xlim([ datetime.strptime(str(tstart), '%Y-%m-%d %H:%M:%S'), datetime.strptime(str(tend), '%Y-%m-%d %H:%M:%S')])
+ax[1].set_ylim([-2,25])
+ax[1].legend()
 
 
 sys.exit('Manual stop')
