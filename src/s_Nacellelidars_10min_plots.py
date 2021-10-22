@@ -62,9 +62,9 @@ plt.rc('figure', figsize =  (8, 8))
 
 # Change parameters to select the data
 device = 'GreenPO' #Select between GreenPO, BluePO, BlackTC
-dt_start ='2021-09-06_00-00-00' # Select start date in the form yyyy-mm-dd_HH-MM-SS
+dt_start ='2021-09-20_00-00-00' # Select start date in the form yyyy-mm-dd_HH-MM-SS
 param = 'HWS hub'
-
+N_dist = (10,20,20)
 
 dt_end = dt.datetime.strptime(dt_start, '%Y-%m-%d_%H-%M-%S')  + dt.timedelta(days=7)# Select end date in the form yyyy-mm-dd_HH-MM-SS
 dt_end = dt_end.strftime('%Y-%m-%d_%H-%M-%S')
