@@ -9,10 +9,10 @@ Created on Wed Mar  3 19:41:21 2021
 # arrange them into one database and one datetime format [##### 100%]
 # check if the timestamps are matching [0%]
 # perform a standardized check using a function definition [##### 100%]
-# perform an advanced check using a function definition [0%]
-# plot the results for each sensor [0%]
-# write the results to an excel file which serves as a logbook for all the sensors [## 40%]
-# save the pdf report generated on the Z drive [# 20%]
+# perform an advanced check using a function definition [##### 100%]
+# plot the results for each sensor [##### 100%]
+# write the results to an excel file which serves as a logbook for all the sensors [##### 100%]
+# save the pdf report generated on the Z drive [##### 100%]
 # send the report to all recipents [0%]
  
 #%% user modules
@@ -26,16 +26,12 @@ sys.path.append(r"../../userModules")
 sys.path.append(r"../../OneDasExplorer/Python Connector")
 
 import runpy as rp
-from FnWsRange import *
 import matplotlib.pyplot as plt
 
 from csv import writer
 import matlab2py as m2p
 from pythonAssist import *
-import tikzplotlib as tz
-from AD180 import AD180
 from datetime import datetime, timezone, timedelta
-import re
 
 from odc_exportData import odc_exportData
 from FnImportOneDas import FnImportOneDas
@@ -127,7 +123,7 @@ data.names = [
 # folder where data will be stored 
 data.folder = r"../data"
 # start and end datetime for data download
-data.tstart = datetime.strptime('2021-10-04_00-00-00', '%Y-%m-%d_%H-%M-%S') # Select start date in the form yyyy-mm-dd_HH-MM-SS
+data.tstart = datetime.strptime('2021-10-17_00-00-00', '%Y-%m-%d_%H-%M-%S') # Select start date in the form yyyy-mm-dd_HH-MM-SS
 # funktioniert
 data.tend = data.tstart + timedelta(days=7) # Select start date in the form yyyy-mm-dd_HH-MM-SS
 _, pdData, t = FnImportOneDas(data.tstart, data.tend, data.paths, data.names, data.sampleRate, data.folder)
@@ -152,9 +148,10 @@ param_max = [30,8000]
 
 # special conditions for filtering
 cond1 = pd.DataFrame(index=pdData.index, columns=param)
-cond1[param[0]] = (pdData[param[0]]) > 1
-cond1[param[1]] = (pdData[param[1]]) >= 0
+cond1[param[0]] = (pdData[param[0]]) > 1 # allow only omega > 1 rpm
+cond1[param[1]] = (pdData[param[1]]) >= 0 # # allow a power >0 kW
 
+# loop through param to give Availability, filtering condition (combined) and statistics
 for i in range(len(param)):
     data.xrange=[param_min[i], param_max[i]]
     data.sampleRate=1/600
@@ -165,9 +162,10 @@ for i in range(len(param)):
     del av, cond, Nstat
 
 # assigning local variables to global
-input.threshold = 0.25
+input.threshold = 0.25 # availability threshold of 25%
 avail.weekly['wt'] = [int(round(x-input.threshold + 0.5)) for x in avail.weekly.loc[:, param].mean(axis=1)]
 avail.filter['wt'] = [x for x in avail.filter.loc[:, param].all(axis=1)]
+del cond1, param, param_min, param_max
 
 #%% Check the availability of iSpin
 ## Filtering conditions
@@ -177,39 +175,47 @@ cond2 = (pdData.s_valid==1) # 95% availability of 10 Hz data, wind vector +-90°
 cond3 = (pdData.s_ok==True)  # data.TotalCountNoRotation=0, 95% availability, min & max rotor rpm, avg rotor rpm, free wind speed > 3.5 m/s, sample ID!= 0
 cond4 = (pdData.s_V > 0) & (pdData.s_V < 50) # wind speed physical limits
 
-## extra parameters for logbook
+## extra parameters for logbook [# to be integrated]
 Nwt_valid = pdData.loc[(cond0 & cond1 & cond2 & cond3),'s_V'].shape[0]
 Nyaw_valid = pdData.loc[(cond0 & cond1 & cond3),'s_V'].shape[0]
 
 # filling in the weekly availabiliy as 1/0 based on number of points
 param= 's_V'
-data.xrange=[0,50]
+param_min, param_max = 0, 50
+data.xrange=[param_min, param_max]
 av, cond, Nstat = FnDataAvailability(data.sampleRate, param, pdData, data.xrange, cond2=cond2)
 
 avail.weekly['ispin'] = av
 avail.filter['ispin'] = cond
 avail.stat['ispin'] = Nstat.transpose()
 del av, cond, Nstat
+del cond0, cond1, cond2, cond3, cond4, param, param_min, param_max
 
 #%% check the availability of Nacelle Lidars
-# check problems in OneDAS
-dev = ['btc', 'bpo', 'gpo']
-Npts, Nvalid, Nws_valid = [], [], []
-for i in range(len(dev)):
-    av, cond = [], []
-    param = dev[i] + '_v110'
-    param_Av = dev[i] + '_Av110'
-    ## Filtering conditions
-    nl_cond0 = pdData[param].notnull()
-    nl_cond3 = (pdData[param_Av]>=0.0)
-    # filling in the weekly availabiliy as 1/0 based on number of points
-    data.xrange = [0,50]
-    av, cond, Nstat = FnDataAvailability(data.sampleRate, param, pdData, data.xrange, cond3=nl_cond3)
 
-    avail.weekly[dev[i]] = av
-    avail.filter[dev[i]] = cond
-    avail.stat[dev[i]] = Nstat.transpose()
+# list of BlackTC, BluePO and GreenPO Nacelle Lidars
+param = ['btc', 'bpo', 'gpo']
+param_min, param_max = 0, 50
+
+# loop through param to give Availability, filtering condition (combined) and statistics
+for i in range(len(param)):
+    av, cond = [], []
+    param_v = param[i] + '_v110'
+    param_Av = param[i] + '_Av110'
+    ## Filtering conditions
+    # Check if the Lidars have Availability > 25% within the 10 minutes
+    nl_cond3 = (pdData[param_Av] >= input.threshold)
+    # filling in the weekly availabiliy as 1/0 based on number of points
+    data.xrange = [param_min, param_max]
+    av, cond, Nstat = FnDataAvailability(data.sampleRate, param_v, pdData, data.xrange, cond3=nl_cond3)
+
+    avail.weekly[param[i]] = av
+    avail.filter[param[i]] = cond
+    avail.stat[param[i]] = Nstat.transpose()
     del av, cond, Nstat
+
+# delete useless variables
+del nl_cond3, param, param_min, param_max, param_v, param_Av
 
 #%% check the availability of the metmast sensors
 param = ['v1','v2','v3','v4','v5','v6','prec','d1','d4','d5','b1','b2','T1']
@@ -217,17 +223,10 @@ param_min = [0,0,0,0,0,0,-0.1,0,0,0,0,0,-60]
 param_max = [50,50,50,50,50,50,100,360,360,360,2000, 2000, 60]
 data.xrange=[[param_min[i],param_max[i]] for i in range(len(param_min))]
 
-# avail.weekly = pd.DataFrame(index=index, columns=param)
-
+# loop through param to give Availability, filtering condition (combined) and statistics
 for i in range(len(param)):
     av, cond=[], []
     # Filtering conditions
-    mm_cond0 = pdData[param[i]].notnull()
-    # Extra parameters for logbook
-    Npts.append(pdData[param[i]].shape[0])
-    Nvalid.append(pdData[param[i]].loc[mm_cond0].shape[0])
-    Nws_valid.append(pdData[param[i]].loc[mm_cond0].shape[0])
-    # filling in the weekly availabiliy as 1/0 based on number of points
     cond_sp = np.isfinite(pdData[param[i]])
     av, cond, Nstat = FnDataAvailability(data.sampleRate, param[i], pdData, data.xrange[i], cond0=cond_sp)
         
@@ -236,23 +235,17 @@ for i in range(len(param)):
     avail.stat[param[i]] = Nstat.transpose()
     del av, cond, Nstat
 
-input.threshold = 0.25
+# Combining the individual sensor availability in one variable
 avail.weekly['metmast'] = [int(round(x-input.threshold + 0.5)) for x in avail.weekly.loc[:, param].mean(axis=1)]
 avail.filter['metmast'] = [x for x in avail.filter.loc[:, param].all(axis=1)]
+# delete useless variables
+del cond_sp, param, param_min, param_max
 
 #%% Check the availability of WindCube
 param='wc_v115'
+param_min, param_max = 0, 50
+data.xrange=[param_min, param_max]
 
-# Filtering conditions
-wc_cond0 = pdData[param].notnull()
-
-# Extra parameters for logbook
-Npts.append(pdData[param].shape[0])
-Nvalid.append(pdData[param].loc[wc_cond0].shape[0])
-Nws_valid.append(pdData[param].loc[wc_cond0].shape[0])
-
-# filling in the weekly availabiliy as 1/0 based on number of points
-data.xrange=[0,50]
 av, cond, Nstat = FnDataAvailability(data.sampleRate, param, pdData, data.xrange)
 
 avail.weekly['windcube'] = av
@@ -275,6 +268,9 @@ data.sonics.names = [
 data.sonics.sampleRate = 20
 _, pdData_sonics, t_sonics = FnImportOneDas(data.tstart, data.tend, data.sonics.paths, data.sonics.names, data.sonics.sampleRate, data.folder)
 param = data.sonics.names
+param_min, param_max = -65, 65
+data.xrange = [param_min, param_max]
+
 # calculate 10 min averages
 import more_itertools
 for i in range(len(param)):
@@ -286,14 +282,6 @@ for i in range(len(param)):
     pdData[param[i]] = np.nanmean(window, axis=0)
 
 for i in range(len(param)):
-    # Filtering conditions
-    sc_cond0 = pdData[param[i]].notnull()
-    # Extra parameters for logbook
-    Npts.append(pdData[param[i]].shape[0])
-    Nvalid.append(pdData[param[i]].loc[sc_cond0].shape[0])
-    Nws_valid.append(pdData[param[i]].loc[sc_cond0].shape[0])
-
-    data.xrange = [-65, 65]
     av, cond, Nstat = FnDataAvailability(data.sampleRate, param[i], pdData, data.xrange)
     avail.weekly[param[i]] = av
     avail.filter[param[i]] = cond
@@ -301,9 +289,11 @@ for i in range(len(param)):
     del av, cond, Nstat
 
 # averaging the gill and thies availability into one column 'sonics'
-input.threshold = 0.25
 avail.weekly['sonics'] = [int(round(x-input.threshold + 0.5)) for x in avail.weekly.loc[:, param].mean(axis=1)]
 avail.filter['sonics'] = [x for x in avail.filter.loc[:, param].all(axis=1)]
+
+# delete useless variables
+del param, param_min, param_max, step, length, N_win, window
 
 #%% download data from DWD portal
 from wetterdienst.provider.dwd.observation import DwdObservationRequest
@@ -325,12 +315,13 @@ param_abbr = ['ws', 'wd', 'prec_T', 'prec_H', 'prec_idx']
 for i in range(len(param)):
     pdData['dwd_' + param_abbr[i]] = station_data.value[station_data.parameter== param[i]].values
 
-#%% Timestamp quaylity check
-from xcorr import xcorr
-lags,c = xcorr(pdData.v1, pdData.btc_v110, normed=False, detrend=False, maxlags=len(pdData.v1)-1)
-plt.plot(lags, c)
+# delete useless variables
+del request, station_data, new_df, param, param_abbr
 
-#%% delete useless variables
+#%% Timestamp quaylity check [to be implemented]
+# from xcorr import xcorr
+# lags,c = xcorr(pdData.v1, pdData.btc_v110, normed=False, detrend=False, maxlags=len(pdData.v1)-1)
+# plt.plot(lags, c)
 
 #%% plot the figures to be input into the pdf report
 from matplotlib.dates import DateFormatter
@@ -382,25 +373,25 @@ ax[2].set_ylim([-10,40])
 ax[2].legend(loc=1)
 ax[2].grid(axis = 'x', color='0.95')
 
-p1 = ax[3].plot(pdData.t[avail.filter['metmast']] , pdData.prec[avail.filter['metmast']] ,'k.',label = 'precipitation')
 p1a = ax[3].plot(pdData.t , pdData.dwd_prec_idx ,'r.',label = 'precipitation DWD')
+p1 = ax[3].plot(pdData.t[avail.filter['metmast']] , pdData.prec[avail.filter['metmast']]*1000 ,'k.',label = 'precipitation')
 ax[3].set_xlabel('date')
-ax[3].set_ylabel("precipitaiton [mm]")
-tw = ax[3].twinx() # instantiate a second axes that shares the same x-axis
-p2 = tw.plot(pdData.t[avail.filter['metmast']] , pdData.RH[avail.filter['metmast']] - 1 ,'g.',label = 'rel. humidity')
-tw.set_ylabel("rel. humidity [%]")
+ax[3].set_ylabel("precipitation [mm]")
+# tw = ax[3].twinx() # instantiate a second axes that shares the same x-axis
+# p2 = tw.plot(pdData.t[avail.filter['metmast']] , pdData.RH[avail.filter['metmast']] - 1 ,'g.',label = 'rel. humidity')
+# tw.set_ylabel("rel. humidity [%]")
 # arrange the legends together
-p = p1+p1a+p2
+p = p1+p1a #+p2
 labs = [l.get_label() for l in p]
 color = [l.get_color() for l in  p]
 ax[3].legend(p, labs, loc=1)
 # axis properties
-tw.yaxis.get_label().set_color(color[1])
-ax[3].yaxis.get_label().set_color(color[0])
+# tw.yaxis.get_label().set_color(color[2])
+# ax[3].yaxis.get_label().set_color(color[0])
 date_form = DateFormatter("%d/%m/%y")
 ax[3].xaxis.set_major_formatter(date_form)
 ax[3].set_xlim([ datetime.strptime(str(data.tstart), '%Y-%m-%d %H:%M:%S'), datetime.strptime(str(data.tend), '%Y-%m-%d %H:%M:%S')])
-ax[3].set_ylim([-2,10])
+ax[3].set_ylim([-1,5])
 tw.set_ylim([-2,150])
 ax[3].legend(loc=7)
 tw.legend(loc=1)
@@ -450,7 +441,7 @@ ax[1].grid(axis = 'x', color='0.95')
 
 ax[2].plot(pdData.t, pdData.s_V, 'k.', lw=0.5, label='iSpin')
 ax[2].plot(pdData.t, pdData.dwd_ws, 'b.', lw=0.25, label='DWD BHV') 
-ax[2].plot(pdData.t[avail.filter['ispin']] , pdData.s_V[avail.filter['ispin']] ,'.',label = 'Valid data')
+# ax[2].plot(pdData.t[avail.filter['ispin']] , pdData.s_V[avail.filter['ispin']] ,'.',label = 'Valid data')
 ax[2].set_xlabel('date')
 ax[2].set_ylabel("wind speed [m/s]")
 date_form = DateFormatter("%d/%m/%y")
@@ -487,6 +478,7 @@ plt.xticks(rotation=30)
 
 fig.savefig("../results/results2.png", format='png')
 
+del ax, color, date_form, fig, labs, p, f, p1, p1a, p2, tw, i, index, 
 #%% write the turbine availability to an excel file
 import openpyxl as opl
 from openpyxl.utils.dataframe import dataframe_to_rows
@@ -522,7 +514,7 @@ output.report = struct()
 
 output.report.styles = getSampleStyleSheet()
 output.report.ps = ParagraphStyle('title', fontSize=20, leading=24)
-output.report.path = SimpleDocTemplate("../results/WeeklyReport.pdf")
+output.report.doc = SimpleDocTemplate("../results/WeeklyReport.pdf")
 
 # create a Title
 output.report.title = Paragraph("Testfeld BHV: Weekly Availability report", output.report.styles["h1"])
@@ -567,10 +559,12 @@ output.report.table_style, output.report.table_data = FnColorCodeTable(output.re
 
 output.report.table = Table(data=output.report.table_data, style=output.report.table_style)
 
+del head1, head2, head3
 #%% add images into pdf
 img1_file = "../results/results1.png"
 img2_file = "../results/results2.png"
 img3_file = "../results/MetmastSensors_17062021.png"
+
 
 im1 = Image(img1_file, 6*inch, 9*inch)
 im2 = Image(img2_file, 6*inch, 9*inch)
@@ -586,7 +580,7 @@ info.append(Paragraph('', output.report.ps))
 info.append(im1)
 info.append(im2)
 
-report.build(info)
+output.report.doc.build(info)
 
 import glob
 import shutil
@@ -598,7 +592,11 @@ for f in glob.glob('../results/WeeklyReport.pdf'):
 for f in glob.glob('../results/*.csv'):
     shutil.copy(f, 'z:/Projekte/109797-TestfeldBHV/30_Technical_execution_Confidential/TP3/AP2_Aufbau_Infrastruktur/Infrastruktur_Windmessung/02_Equipment/Data Management/WeeklyReports')
 
-#%% Sending Email to recipents with the report attached
+del img1_file, img2_file, img3_file, im1, im2, im3, info, 
+
+sys.exit('manual Stop')
+
+#%% Sending Email to recipents with the report attached [## to be completed later]
 # def FnSendEmail
 import email, smtplib, ssl
 from email import encoders
@@ -617,7 +615,7 @@ port = 25  # For SSL
 smtp_server = '153.96.93.5'
 sender_email = "ashim.giyanani@iwes.fraunhofer.de"  # Enter your address
 receiver_email = "ashim.giyanani@iwes.fraunhofer.de"  # Enter receiver address
-password = 'Hiranand2121/8576'
+password = ''
 # message = """\
 # Subject: Hi there
 
@@ -670,7 +668,6 @@ with smtplib.SMTP(smtp_server, port) as server:
     server.login(sender_email, password)
     server.sendmail(sender_email, receiver_email, message)    
 
-sys.exit('manual')
 
 #%% Removed code
 # path = r'c:\Users\giyash\OneDrive - Fraunhofer\Python\Data\OneDAS_2019-01-01T00-00_600_s_56c64a34'
