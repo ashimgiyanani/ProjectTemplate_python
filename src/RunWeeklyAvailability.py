@@ -381,7 +381,7 @@ p1b = ax[3].plot(pdData.t, pdData.prec_sum/25, 'b.', label='prec_sum')
 ax[3].set_xlabel('date')
 ax[3].set_ylabel("precipitation [mm]")
 # arrange the legends together
-p = p1a+p1b+p1c
+p = p1a+p1b
 labs = [l.get_label() for l in p]
 color = [l.get_color() for l in  p]
 ax[3].legend(p, labs, ncol=3)
