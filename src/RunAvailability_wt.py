@@ -70,6 +70,7 @@ data.paths = [
     '/AIRPORT/AD8_PROTOTYPE/GENERAL_DAQ/M0040_V5/600 s_mean',
     '/AIRPORT/AD8_PROTOTYPE/GENERAL_DAQ/M0050_V6/600 s_mean',
     '/AIRPORT/AD8_PROTOTYPE/GENERAL_DAQ/M0060_Precipitation/600 s_mean',
+    '/AIRPORT/AD8_PROTOTYPE/GENERAL_DAQ/M0060_Precipitation/600 s_sum',
     '/AIRPORT/AD8_PROTOTYPE/GENERAL_DAQ/M0230_H1/600 s_mean',
     '/AIRPORT/AD8_PROTOTYPE/GENERAL_DAQ/M0070_D1/600 s_mean_polar',
     '/AIRPORT/AD8_PROTOTYPE/GENERAL_DAQ/M0100_D4/600 s_mean_polar',
@@ -100,6 +101,7 @@ data.names = [
         'v5',
         'v6',
         'prec',
+        'prec_sum',
         'RH',
         'd1',
         'd4',
@@ -123,7 +125,7 @@ data.names = [
 # folder where data will be stored 
 data.folder = r"../data"
 # start and end datetime for data download
-data.tstart = datetime.strptime('2021-10-17_00-00-00', '%Y-%m-%d_%H-%M-%S') # Select start date in the form yyyy-mm-dd_HH-MM-SS
+data.tstart = datetime.strptime('2021-10-21_00-00-00', '%Y-%m-%d_%H-%M-%S') # Select start date in the form yyyy-mm-dd_HH-MM-SS
 # funktioniert
 data.tend = data.tstart + timedelta(days=7) # Select start date in the form yyyy-mm-dd_HH-MM-SS
 _, pdData, t = FnImportOneDas(data.tstart, data.tend, data.paths, data.names, data.sampleRate, data.folder)
@@ -218,9 +220,9 @@ for i in range(len(param)):
 del nl_cond3, param, param_min, param_max, param_v, param_Av
 
 #%% check the availability of the metmast sensors
-param = ['v1','v2','v3','v4','v5','v6','prec','d1','d4','d5','b1','b2','T1']
-param_min = [0,0,0,0,0,0,-0.1,0,0,0,0,0,-60]
-param_max = [50,50,50,50,50,50,100,360,360,360,2000, 2000, 60]
+param = ['v1','v2','v3','v4','v5','v6','prec','prec_sum','d1','d4','d5','b1','b2','T1']
+param_min = [0,0,0,0,0,0,-0.1,0,0,0,0,0,0,-60]
+param_max = [50,50,50,50,50,50,100,100,360,360,360,2000, 2000, 60]
 data.xrange=[[param_min[i],param_max[i]] for i in range(len(param_min))]
 
 # loop through param to give Availability, filtering condition (combined) and statistics
@@ -373,27 +375,21 @@ ax[2].set_ylim([-10,40])
 ax[2].legend(loc=1)
 ax[2].grid(axis = 'x', color='0.95')
 
-p1a = ax[3].plot(pdData.t , pdData.dwd_prec_idx ,'r.',label = 'precipitation DWD')
-p1 = ax[3].plot(pdData.t[avail.filter['metmast']] , pdData.prec[avail.filter['metmast']]*1000 ,'k.',label = 'precipitation')
+p1a = ax[3].plot(pdData.t , pdData.dwd_prec_H ,'r.',label = 'precipitation DWD')
+p1b = ax[3].plot(pdData.t, pdData.prec_sum/25, 'b.', label='prec_sum')
+# p1c = ax[3].plot(pdData.t[avail.filter['metmast']] , pdData.prec[avail.filter['metmast']]*1000 ,'k.',label = 'precipitation')
 ax[3].set_xlabel('date')
 ax[3].set_ylabel("precipitation [mm]")
-# tw = ax[3].twinx() # instantiate a second axes that shares the same x-axis
-# p2 = tw.plot(pdData.t[avail.filter['metmast']] , pdData.RH[avail.filter['metmast']] - 1 ,'g.',label = 'rel. humidity')
-# tw.set_ylabel("rel. humidity [%]")
 # arrange the legends together
-p = p1+p1a #+p2
+p = p1a+p1b+p1c
 labs = [l.get_label() for l in p]
 color = [l.get_color() for l in  p]
-ax[3].legend(p, labs, loc=1)
-# axis properties
-# tw.yaxis.get_label().set_color(color[2])
-# ax[3].yaxis.get_label().set_color(color[0])
+ax[3].legend(p, labs, ncol=3)
 date_form = DateFormatter("%d/%m/%y")
 ax[3].xaxis.set_major_formatter(date_form)
 ax[3].set_xlim([ datetime.strptime(str(data.tstart), '%Y-%m-%d %H:%M:%S'), datetime.strptime(str(data.tend), '%Y-%m-%d %H:%M:%S')])
-ax[3].set_ylim([-1,5])
-tw.set_ylim([-2,150])
-ax[3].legend(loc=7)
+ax[3].set_ylim([-1,3])
+ax[3].legend(loc=1, ncol=3, mode='expand')
 tw.legend(loc=1)
 ax[3].grid(axis = 'x', color='0.95')
 
@@ -478,7 +474,7 @@ plt.xticks(rotation=30)
 
 fig.savefig("../results/results2.png", format='png')
 
-del ax, color, date_form, fig, labs, p, f, p1, p1a, p2, tw, i, index, 
+del ax, color, date_form, fig, labs, p, p1, p1a, p2, tw, i, index, 
 #%% write the turbine availability to an excel file
 import openpyxl as opl
 from openpyxl.utils.dataframe import dataframe_to_rows
