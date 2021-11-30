@@ -125,7 +125,7 @@ data.names = [
 # folder where data will be stored 
 data.folder = r"../data"
 # start and end datetime for data download
-data.tstart = datetime.strptime('2021-10-21_00-00-00', '%Y-%m-%d_%H-%M-%S') # Select start date in the form yyyy-mm-dd_HH-MM-SS
+data.tstart = datetime.strptime('2021-10-18_00-00-00', '%Y-%m-%d_%H-%M-%S') # Select start date in the form yyyy-mm-dd_HH-MM-SS
 # funktioniert
 data.tend = data.tstart + timedelta(days=7) # Select start date in the form yyyy-mm-dd_HH-MM-SS
 _, pdData, t = FnImportOneDas(data.tstart, data.tend, data.paths, data.names, data.sampleRate, data.folder)
@@ -376,7 +376,7 @@ ax[2].legend(loc=1)
 ax[2].grid(axis = 'x', color='0.95')
 
 p1a = ax[3].plot(pdData.t , pdData.dwd_prec_H ,'r.',label = 'precipitation DWD')
-p1b = ax[3].plot(pdData.t, pdData.prec_sum/25, 'b.', label='prec_sum')
+p1b = ax[3].plot(pdData.t, pdData.prec_sum, 'b.', label='prec_sum')
 # p1c = ax[3].plot(pdData.t[avail.filter['metmast']] , pdData.prec[avail.filter['metmast']]*1000 ,'k.',label = 'precipitation')
 ax[3].set_xlabel('date')
 ax[3].set_ylabel("precipitation [mm]")
@@ -520,11 +520,10 @@ output.report.par1 = Paragraph(" <br/> The weekly report presents the availabili
         based on 10-min. average data from OneDAS. The threshold for data availability within a day is 25% \
             i.e. if the sensor availability is 50%, it is termed as 1 (green) <br/> \
         Note: <br/>\
-            Data Availability > 25% ---> 1 <br/> \
-            Data Availability < 25% ---> 0 <br/> \
+            Data Availability > 25% ---> 1,  (else 0) <br/> \
             wt - wind turbine AD8-180 sensors (omega, Pw) combined into one variable <br/>\
             metmast - Availability combination of sensors on metmast except sonic anemometers <br/> \
-            sonics - Availability combination of gill_u115, gill_u55 and thies_u25 <br/> <br/>\
+            sonics - Availability combination of gill_u115, gill_u55 and thies_u25 <br/> \
                      ", output.report.styles["Normal"])
 # create a Table
 # generate a table borders
@@ -569,7 +568,7 @@ im3 = Image(img3_file, 7*inch, 8*inch)
 info = []
 info.append(output.report.title)
 info.append(output.report.par1)
-# info.append(Spacer(1,0.5*inch))
+# info.append(Spacer(1,0.25*inch))
 info.append(output.report.table)
 info.append(im3)
 info.append(Paragraph('', output.report.ps))
