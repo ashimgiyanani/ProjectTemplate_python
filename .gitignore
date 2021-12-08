@@ -125,3 +125,4 @@ dmypy.json
 
 *.csv
 *.pdf
+results/WeeklyReport.pdf

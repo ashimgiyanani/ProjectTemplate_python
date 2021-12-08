@@ -125,7 +125,7 @@ data.names = [
 # folder where data will be stored 
 data.folder = r"../data"
 # start and end datetime for data download
-data.tstart = datetime.strptime('2021-10-18_00-00-00', '%Y-%m-%d_%H-%M-%S') # Select start date in the form yyyy-mm-dd_HH-MM-SS
+data.tstart = datetime.strptime('2021-11-25_00-00-00', '%Y-%m-%d_%H-%M-%S') # Select start date in the form yyyy-mm-dd_HH-MM-SS
 # funktioniert
 data.tend = data.tstart + timedelta(days=7) # Select start date in the form yyyy-mm-dd_HH-MM-SS
 _, pdData, t = FnImportOneDas(data.tstart, data.tend, data.paths, data.names, data.sampleRate, data.folder)
@@ -520,7 +520,7 @@ output.report.par1 = Paragraph(" <br/> The weekly report presents the availabili
         based on 10-min. average data from OneDAS. The threshold for data availability within a day is 25% \
             i.e. if the sensor availability is 50%, it is termed as 1 (green) <br/> \
         Note: <br/>\
-            Data Availability > 25% ---> 1,  (else 0) <br/> \
+            Data Availability [< 25% ---> 0 (red)],  [> 75% ---> 1 (green)],  [between 25%-75% ---> -1 (orange)] <br/> \
             wt - wind turbine AD8-180 sensors (omega, Pw) combined into one variable <br/>\
             metmast - Availability combination of sensors on metmast except sonic anemometers <br/> \
             sonics - Availability combination of gill_u115, gill_u55 and thies_u25 <br/> \
@@ -546,6 +546,8 @@ def FnColorCodeTable(table_data):
                 table_style.add('BACKGROUND', (column, row), (column, row), colors.red)
             elif value == 1:
                 table_style.add('BACKGROUND', (column, row), (column, row), colors.green)
+            elif value == -1:
+                table_style.add('BACKGROUND', (column, row), (column, row), colors.orange)
             else:
                 table_style.add('BACKGROUND', (column, row), (column, row), colors.white)
     return table_style, table_data
