@@ -1,24 +1,17 @@
-name: null
-
+name: base
 channels:
-  - intel
   - conda-forge
   - defaults
-
 dependencies:
-  - bokeh
-  - gh
-  - git
-  - holoviews
-  - jupyterlab>=3.0
-  - jupyterlab-git
-  - jupyterlab-lsp
-  - matplotlib
   - pandas
-  - panel
-  - pip
+  - matplotlib
+  - ipykernel
+  - scipy
+  - aiohttp
+  - requests
+  - more-itertools
+  - wetterdienst
+  - openpyxl
+  - reportlab
   - pip:
-    - -r file:requirements.txt
-  - python
-  - pyviz_comms
-  - xeus-python
+prefix: C:\Users\giyash\Miniconda3
