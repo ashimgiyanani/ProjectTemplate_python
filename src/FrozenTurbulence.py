@@ -21,6 +21,9 @@
 # side task:
 # understand pycontrub - custom wind speed and sig profiles
 
+# remarks:
+# Kaimal works best for Nfft >= 2^16
+
 # %%
 # import modules
 %matplotlib inline
@@ -71,7 +74,7 @@ wind.dX = wind.dt*wind.Uhub # step in longitudinal direction
 
 try:
 	wind.dt
-	wind.Nfft = np.power(2, 12)
+	wind.Nfft = np.power(2, 16)
 	wind.T = wind.Nfft*wind.dt # total time [s]
 except NameError:
 	wind.dt = wind.dx/wind.Uhub
